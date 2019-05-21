@@ -1,0 +1,51 @@
+--- 
+- 
+  name: "Generating CSR for destination machine"
+  gather_facts: true
+  hosts: all
+  vars: 
+    files_dir: /etc/ansible/files
+    home_dir: /etc/ansible
+    keydump: /etc/ansible/keydump
+    san_file: san.cnf
+  tasks: 
+    - 
+      name: "Generate an OpenSSL private key with a different size (2048 bits)"
+      openssl_privatekey: 
+        path: "{{ keydump }}/{{ ansible_hostname }}.key"
+        size: 2048
+    - 
+      copy: 
+        dest: "{{ keydump }}/san.cnf"
+        group: ansible
+        mode: "0644"
+        owner: ansible
+        src: "{{ files_dir }}/san.cnf"
+      name: "Copy san.cnf file over to destination"
+    - 
+      name: "Set fqdn in san.cnf"
+      replace: 
+        path: "{{ keydump }}/san.cnf"
+        regexp: replaceme_fqdn
+        replace: "{{ ansible_fqdn }}"
+    - 
+      name: "Set shortname in san.cnf"
+      replace: 
+        path: "{{ keydump }}/san.cnf"
+        regexp: replaceme_short
+        replace: "{{ ansible_hostname }}"
+    - 
+      name: "Set fqdn in san.cnf"
+      replace: 
+        path: "{{ keydump }}/san.cnf"
+        regexp: replaceme_ip
+        replace: "{{ ansible_eth0.ipv4.address }}"
+    - 
+      name: "Generate CSR based on san.cnf"
+      shell: "openssl req -new -config {{ keydump }}/san.cnf -key {{ keydump }}/{{ ansible_hostname }}.key -out {{ keydump }}/{{ ansible_hostname }}.csr"
+    - 
+      name: "Here's your CSR"
+      synchronize: 
+        dest: "/tmp/{{ ansible_hostname }}.csr"
+        mode: pull
+        src: "{{ keydump }}/{{ ansible_hostname }}.csr"
